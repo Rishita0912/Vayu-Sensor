@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drone-Collected AQI Data</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-image: url('https://theleaflet.in/wp-content/uploads/2019/11/Delhi-air-pollution.jpg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        backdrop-filter: blur(0px);        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .input-icon {
+            position: absolute;
+            top: 50%;
+            left: 10px;
+            transform: translateY(-50%);
+            color: black;
+        }
+        .custom-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: white;
+            padding: 10px 10px 10px 40px;
+            transition: all 0.3s ease;
+        }
+        .custom-input:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+        }
+        .custom-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+            
+        }
+
+        .w-full{
+            background-color: grey;
+            color: black;
+        }
+
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 10px;
+        }
+        .aqi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+        .aqi-card {
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .aqi-card:hover {
+            transform: translateY(-5px);
+        }
+        
+
+        
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex flex-col">
+    <header class="text-black text-center py-8">
+        <h1 class="text-4xl font-bold">
+            <i class="fas fa-wind mr-2"></i>वायु SENSOR
+        </h1>
+    </header>
+    
+    <main class="flex-grow flex flex-col p-4 space-y-4">
+        <div class="glass-effect p-6">
+            <form id="aqi-form" class="flex flex-col md:flex-row md:items-end space-y-4 md:space-y-0 md:space-x-4">
+                <div class="flex-grow">
+                    <label for="location" class="block mb-2 font-medium text">Location:</label>
+                    <div class="relative">
+                        <i class="fas fa-map-marker-alt input-icon"></i>
+                        <select id="location" name="location" class="custom-input w-full appearance-none" required>
+                            <option value="" disabled selected>Select a location</option>
+                            <option value="current-location">Current Location</option>
+                            <option value="CENTRAL DELHI">CENTRAL DELHI</option>
+                            <option value="CHANDNI CHOWK">CHANDNI CHOWK</option>
+                            <option value="CONNAUGHT PLACE">CONNAUGHT PLACE</option>
+                            <option value="DWARKA">DWARKA</option>
+                            <option value="EAST DELHI">EAST DELHI</option>
+                            <option value="HAUZ KHAS">HAUZ KHAS</option>
+                            <option value="INDIA GATE">INDIA GATE</option>
+                            <option value="JANAKPURI">JANAKPURI</option>
+                            <option value="JANPATH">JANPATH</option>
+                            <option value="KALKAJI">KALKAJI</option>
+                            <option value="KAROL BAGH">KAROL BAGH</option>
+                            <option value="LAJPAT NAGAR">LAJPAT NAGAR</option>
+                            <option value="MAUJPUR">MAUJPUR</option>
+                            <option value="NEW DELHI">NEW DELHI</option>
+                            <option value="NORTH DELHI">NORTH DELHI</option>
+                            <option value="NORTH EAST DELHI">NORTH EAST DELHI</option>
+                            <option value="NORTH WEST DELHI">NORTH WEST DELHI</option>
+                            <option value="PALAM">PALAM</option>
+                            <option value="QUTUB MINAR">QUTUB MINAR</option>
+                            <option value="RED FORT">RED FORT</option>
+                            <option value="ROHINI">ROHINI</option>
+                            <option value="SHAHDARA">SHAHDARA</option>
+                            <option value="SOUTH DELHI">SOUTH DELHI</option>
+                            <option value="SOUTH EAST DELHI">SOUTH EAST DELHI</option>
+                            <option value="SOUTH EX">SOUTH EX</option>
+                            <option value="SOUTH WEST DELHI">SOUTH WEST DELHI</option>
+                            <option value="WEST DELHI">WEST DELHI</option>
+                            
+        
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex-grow">
+                    <label for="date" class="block mb-2 font-medium text">Date:</label>
+                    <div class="relative">
+                        <i class="far fa-calendar-alt input-icon"></i>
+                        <input type="date" id="date" name="date" class="custom-input w-full" required>
+                    </div>
+                </div>
+                <div class="flex-grow" >
+                    <label for="time" class="block mb-2 font-medium text">Time:</label>
+                    <div class="relative">
+                        <i class="far fa-clock input-icon"></i>
+                        <input type="time" id="time" name="time" class="custom-input w-full" required>
+                    </div>
+                </div>
+                <div class="md:self-stretch flex items-end">
+                    <button type="submit" class="w-full bg-indigo-500 text-white py-3 px-6 rounded-lg hover:bg-indigo-600 transition duration-300 flex items-center justify-center">
+                        <i class="fas fa-search mr-2"></i>Get AQI Data
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="glass-effect p-6">
+            <h2 class="text-2xl font-semibold mb-4 text-black">Location Map</h2>
+            <div id="map"></div>
+        </div>
+
+        <div class="glass-effect p-6">
+            <h2 class="text-2xl font-semibold mb-4 text-black">AQI Results</h2>
+            <div id="aqi-grid" class="aqi-grid"></div>
+        </div>
+
+        <div class="glass-effect p-6">
+            <h2 class="text-2xl font-semibold mb-4 text-black">Historical AQI Data</h2>
+            <canvas id="aqi-chart"></canvas>
+        </div>
+    </main>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([28.6139, 77.2090], 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var marker;
+
+        // Location coordinates (example values)
+        const locations = {
+            'current-location': [28.6139, 77.2090],
+            'CENTRAL DELHI': [28.6512, 77.2315],
+            'CHANDNI CHOWK': [28.6562, 77.2280],
+            'CONNAUGHT PLACE': [28.6315, 77.2167],
+            'DWARKA': [28.5662, 77.1031],
+            'EAST DELHI': [28.6271, 77.2784],
+            'HAUZ KHAS': [28.5494, 77.2001],
+            'INDIA GATE': [28.6129, 77.2295],
+            'JANAKPURI': [28.6219, 77.0852],
+            'JANPATH': [28.6252, 77.2187],
+            'KALKAJI': [28.5375, 77.2596],
+            'KAROL BAGH': [28.6517, 77.1906],
+            'LAJPAT NAGAR': [28.5676, 77.2430],
+            'MAUJPUR': [28.6748, 77.2781],
+            'NEW DELHI': [28.6139, 77.2090],
+            'NORTH DELHI': [28.7041, 77.1025],
+            'NORTH EAST DELHI': [28.7306, 77.2594],
+            'NORTH WEST DELHI': [28.7184, 77.1201],
+            'PALAM': [28.5800, 77.1265],
+            'QUTUB MINAR': [28.5245, 77.1855],
+            'RED FORT': [28.6562, 77.2410],
+            'ROHINI': [28.7361, 77.0901],
+            'SHAHDARA': [28.6752, 77.2913],
+            'SOUTH DELHI': [28.5276, 77.2203],
+            'SOUTH EAST DELHI': [28.5245, 77.1855],
+            'SOUTH EX': [28.5676, 77.2430],
+            'SOUTH WEST DELHI': [28.5662, 77.1031],
+            'WEST DELHI': [28.6469, 77.0990]
+
+            
+     };
+
+        document.getElementById('location').addEventListener('change', function(e) {
+            const selectedLocation = e.target.value;
+
+            if (selectedLocation === 'current-location') {
+                // Use Geolocation API to get the current position
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(function(position) {
+                        const currentCoords = [
+                       
+                            position.coords.latitude,
+                            position.coords.longitude
+                        ];
+
+                        if (marker) {
+                            map.removeLayer(marker);
+                        }
+
+                        // Add a marker for the current location and set the view
+                        marker = L.marker(currentCoords).addTo(map);
+                        map.setView(currentCoords, 13);
+                    }, function(error) {
+                        console.error("Error getting current location: ", error);
+                        alert("Unable to retrieve your location.");
+                    });
+                } else {
+                    alert("Geolocation is not supported by your browser.");
+                }
+            } else {
+                // For predefined locations
+                const coords = locations[selectedLocation];
+                if (coords) {
+                    if (marker) {
+                        map.removeLayer(marker);
+                    }
+                    marker = L.marker(coords).addTo(map);
+                    map.setView(coords, 13);
+                }
+            }
+        });
+
+        document.getElementById('aqi-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            updateAQIGrid();
+            updateChart();
+        });
+
+        function getAQIColor(value) {
+            if (value <= 50) return 'bg-green-500';
+            if (value <= 100) return 'bg-yellow-500';
+            if (value <= 150) return 'bg-orange-500';
+            if (value <= 200) return 'bg-red-500';
+            if (value <= 300) return 'bg-purple-500';
+            return 'bg-red-900';
+        }
+
+        function getAQIDescription(value) {
+            if (value <= 50) return 'Good';
+            if (value <= 100) return 'Moderate';
+            if (value <= 150) return 'Unhealthy for Sensitive Groups';
+            if (value <= 200) return 'Unhealthy';
+            if (value <= 300) return 'Very Unhealthy';
+            return 'Hazardous';
+        }
+
+        function updateAQIGrid() {
+            const grid = document.getElementById('aqi-grid');
+            grid.innerHTML = '';
+            Object.keys(locations).forEach(location => {
+                const aqiValue = Math.floor(Math.random() * 500);
+                const card = document.createElement('div');
+                //card.className = aqi-card ${getAQIColor(aqiValue)} text-white;
+                card.innerHTML = `
+                    <h3 class="text-xl font-semibold mb-2">${location.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</h3>
+                    <p class="text-4xl font-bold mb-2">${aqiValue}</p>
+                    <p>${getAQIDescription(aqiValue)}</p>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Initialize the chart
+        const ctx = document.getElementById('aqi-chart').getContext('2d');
+        const aqiChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
+                datasets: [{
+                    label: 'Central Park',
+                    data: [65, 59, 80, 81, 56, 55, 40],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }, {
+                    label: 'Downtown',
+                    data: [28, 48, 40, 19, 86, 27, 90],
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1
+                }, {
+                    label: 'Industrial Zone',
+                    data: [80, 95, 70, 85, 110, 100, 75],
+                    borderColor: 'rgb(255, 205, 86)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'AQI Trends by Location'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'AQI Value'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Month'
+                        }
+                    }
+                }
+            }
+        });
+
+        function updateChart() {
+            aqiChart.data.datasets.forEach((dataset) => {
+                dataset.data = dataset.data.map(() => Math.floor(Math.random() * 150));
+            });
+            aqiChart.update();
+        }
+
+        // Initial update
+        updateAQIGrid();
+    </script>
+</body>
+</html>

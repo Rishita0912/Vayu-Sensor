@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drone-Collected AQI Data</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.5) 0%, rgba(118, 75, 162, 0.5) 100%), url('https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExeXh0Z2h3MXR4YjM0MW9wcXNqbjE1MmJheG52dnhsemwyd2RqbGFxeCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/xT9IgqjmZ870vakg4E/giphy.gif');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            backdrop-filter: blur(0px);
+        }
+
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .input-icon {
+            position: absolute;
+            top: 50%;
+            left: 10px;
+            transform: translateY(-50%);
+            color: black;
+        }
+
+        .custom-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: white;
+            padding: 10px 10px 10px 40px;
+            transition: all 0.3s ease;
+        }
+
+        .custom-input:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+        }
+
+        .custom-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .w-full {
+            background-color: grey;
+            color: black;
+        }
+
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 10px;
+        }
+
+        .aqi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .aqi-card {
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .aqi-card:hover {
+            transform: translateY(-5px);
+        }
+    </style>
+</head>
+
+<body class="gradient-bg min-h-screen flex flex-col">
+    <header class="text-black text-center py-8">
+        <h1 class="text-4xl font-bold">
+            <i class="fas fa-wind mr-2"></i>वायु SENSOR
+        </h1>
+    </header>
+
+    <main class="flex-grow flex flex-col p-4 space-y-4">
+        <div class="glass-effect p-6">
+            <form id="aqi-form" class="flex flex-col md:flex-row md:items-end space-y-4 md:space-y-0 md:space-x-4">
+                <!-- State Selection -->
+                <div class="flex-grow">
+                    <label for="state" class="block mb-2 font-medium text">State:</label>
+                    <div class="relative">
+                        <i class="fas fa-map-marker-alt input-icon"></i>
+                        <select id="state" name="state" class="custom-input w-full appearance-none" required>
+                            <option value="" disabled selected>Select a state</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- City Selection -->
+                <div class="flex-grow">
+                    <label for="city" class="block mb-2 font-medium text">City:</label>
+                    <div class="relative">
+                        <i class="fas fa-city input-icon"></i>
+                        <select id="city" name="city" class="custom-input w-full appearance-none" required>
+                            <option value="" disabled selected>Select a city</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Date and Time Selection -->
+                <div class="flex-grow">
+                    <label for="datetime" class="block mb-2 font-medium text">Date & Time:</label>
+                    <input type="datetime-local" id="datetime" name="datetime" class="custom-input w-full" required>
+                </div>
+
+                <div class="md:self-stretch flex items-end">
+                    <button type="submit" class="w-full bg-indigo-500 text-white py-3 px-6 rounded-lg hover:bg-indigo-600 transition duration-300 flex items-center justify-center">
+                        <i class="fas fa-search mr-2"></i>Get AQI Data
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Map Section -->
+        <div class="glass-effect p-6">
+            <h2 class="text-2xl font-semibold mb-4 text-black">Location Map</h2>
+            
+            <div id="map"></div>
+        </div>
+
+        <!-- AQI Results Section -->
+        <div class="glass-effect p-6">
+            <h2 class="text-2xl font-semibold mb-4 text-black">AQI Results</h2>
+            <div id="aqi-grid" class="aqi-grid"></div>
+        </div>
+
+        <!-- Historical AQI Data -->
+        <div class="glass-effect p-6">
+            <h2 class="text-2xl font-semibold mb-4 text-black">Historical AQI Data</h2>
+            <canvas id="aqi-chart"></canvas>
+        </div>
+    </main>
+
+    <script>
+        // State and City Data
+        const stateCityData = {
+            'Andhra Pradesh': ['Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Tirupati'],
+            'Arunachal Pradesh': ['Itanagar', 'Tawang', 'Ziro', 'Pasighat'],
+            'Assam': ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat', 'Tezpur'],
+            'Bihar': ['Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur', 'Purnia'],
+            'Chhattisgarh': ['Raipur', 'Bilaspur', 'Durg', 'Korba', 'Rajnandgaon'],
+            'Delhi': ['New Delhi', 'Dwarka', 'Chandni Chowk', 'Rohini', 'Karol Bagh'],
+            'Goa': ['Panaji', 'Margao', 'Vasco da Gama', 'Mapusa', 'Ponda'],
+            'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar'],
+            'Haryana': ['Gurgaon', 'Faridabad', 'Panipat', 'Ambala', 'Karnal'],
+            'Himachal Pradesh': ['Shimla', 'Manali', 'Dharamshala', 'Kullu', 'Solan'],
+            'Jammu and Kashmir': ['Srinagar', 'Jammu', 'Leh', 'Anantnag', 'Baramulla'],
+            'Jharkhand': ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Deoghar'],
+            'Karnataka': ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi'],
+            'Kerala': ['Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Thrissur', 'Kollam'],
+            'Madhya Pradesh': ['Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Ujjain'],
+            'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Thane'],
+            // Add more states and cities as needed
+        };
+
+        // Populate state dropdown
+        const stateSelect = document.getElementById('state');
+        const citySelect = document.getElementById('city');
+
+        Object.keys(stateCityData).forEach(state => {
+            const option = document.createElement('option');
+            option.value = state;
+            option.textContent = state;
+            stateSelect.appendChild(option);
+        });
+
+        // Event listener for state change
+        stateSelect.addEventListener('change', function() {
+            const selectedState = this.value;
+
+            // Clear existing cities
+            citySelect.innerHTML = '<option value="" disabled selected>Select a city</option>';
+
+            // Populate the city dropdown based on selected state
+            stateCityData[selectedState].forEach(city => {
+                const option = document.createElement('option');
+                option.value = city;
+                option.textContent = city;
+                citySelect.appendChild(option);
+            });
+        });
+    </script>
+</body>
+
+</html>
